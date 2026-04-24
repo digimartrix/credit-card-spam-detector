@@ -1,0 +1,27 @@
+# Large data files
+creditcard.csv
+creditcard.csv.zip
+credit-card-fraud-detection-predictive-models.ipynb
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Vercel
+.vercel/
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config.title }}</title>
+    <meta name="description" content="Real-time credit card fraud detection dashboard with ML-powered risk scoring, live transaction monitoring, and SMS alerts.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-page="dashboard">
+    <!-- ── Global Header ── -->
+    <header class="app-header" id="app-header">
+        <div class="app-header-inner">
+            <a href="/dashboard" class="app-logo-link">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="EXPayshield" class="app-logo-img">
+                <div class="app-logo-text">
+                    <span class="app-name">EXPayshield</span>
+                    <span class="app-tagline">Fraud Detection</span>
+                </div>
+            </a>
+
+            <div class="app-header-right">
+                <div class="app-profile" id="profile-dropdown-trigger">
+                    <div class="app-avatar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div class="app-profile-info">
+                        <span class="app-profile-phone">{{ config.session.user_phone_masked }}</span>
+                        <span class="app-profile-role">Authenticated</span>
+                    </div>
+                </div>
+                <button id="logout-button" class="button button-secondary button-sm" type="button">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="shell">
+        <header class="hero card">
+            <div class="hero-copy">
+                <div class="eyebrow">{{ config.hero.eyebrow }}</div>
+                <h1>{{ config.hero.title }}</h1>
+                <p>{{ config.hero.description }}</p>
+            </div>
+        </header>
+
+        <section class="stats-grid">
+            {% for stat in config.stats %}
+            <article class="card stat-card">
+                <span>{{ stat.label }}</span>
+                <strong>{{ stat.value }}</strong>
+            </article>
+            {% endfor %}
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- LIVE TRANSACTION MONITOR — Real-time simulation feed           -->
+        <!-- ============================================================= -->
+        <section class="card live-monitor-card" id="live-monitor-section">
+            <div class="section-head">
+                <div>
+                    <h2>🔴 Live Transaction Monitor</h2>
+                    <p>Real-time incoming transactions are auto-detected every 3 seconds. Fraud alerts are sent via SMS.</p>
+                </div>
+                <div class="live-controls">
+                    <div class="live-indicator" id="live-indicator">
+                        <span class="live-dot"></span>
+                        <span class="live-label">LIVE</span>
+                    </div>
+                    <button id="toggle-live" class="button button-secondary" type="button">Pause</button>
+                </div>
+            </div>
+
+            <!-- Live stats counters -->
+            <div class="live-stats-row" id="live-stats-row">
+                <div class="live-stat">
+                    <span class="live-stat-label">Total Processed</span>
+                    <strong class="live-stat-value" id="live-total-count">0</strong>
+                </div>
+                <div class="live-stat safe-stat">
+                    <span class="live-stat-label">Approved</span>
+                    <strong class="live-stat-value" id="live-safe-count">0</strong>
+                </div>
+                <div class="live-stat suspicious-stat">
+                    <span class="live-stat-label">Suspicious</span>
+                    <strong class="live-stat-value" id="live-suspicious-count">0</strong>
+                </div>
+                <div class="live-stat fraud-stat">
+                    <span class="live-stat-label">Blocked</span>
+                    <strong class="live-stat-value" id="live-fraud-count">0</strong>
+                </div>
+            </div>
+
+            <!-- Current transaction being analyzed -->
+            <div class="live-current" id="live-current">
+                <div class="live-current-empty" id="live-current-empty">
+                    <div class="pulse-ring"></div>
+                    <p>Waiting for incoming transactions...</p>
+                </div>
+                <div class="live-current-active" id="live-current-active" hidden>
+                    <div class="live-tx-header">
+                        <div class="live-tx-info">
+                            <h3 id="live-tx-merchant">—</h3>
+                            <span id="live-tx-details">—</span>
+                        </div>
+                        <div class="live-tx-amount" id="live-tx-amount">$0.00</div>
+                    </div>
+                    <div class="live-tx-meta">
+                        <span id="live-tx-card">**** **** **** ****</span>
+                        <span id="live-tx-holder">—</span>
+                        <span id="live-tx-time">—</span>
+                    </div>
+                    <div class="live-tx-result" id="live-tx-result" hidden>
+                        <div class="live-result-header">
+                            <span class="risk-chip" id="live-risk-chip">—</span>
+                            <strong id="live-risk-score">0.0 / 100</strong>
+                        </div>
+                        <div class="progress-track">
+                            <div id="live-risk-bar" class="progress-bar"></div>
+                        </div>
+                        <p class="live-decision" id="live-decision-text">—</p>
+                        <div class="live-alert-badge" id="live-alert-badge" hidden></div>
+                    </div>
+                    <div class="live-analyzing" id="live-analyzing" hidden>
+                        <div class="spinner"></div>
+                        <span>Analyzing with ML model...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live transaction feed table -->
+            <div class="live-feed-section">
+                <h4>Recent Live Transactions</h4>
+                <div class="history-table-shell">
+                    <table class="history-table live-feed-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Card</th>
+                                <th>Customer</th>
+                                <th>Merchant</th>
+                                <th>City</th>
+                                <th>Amount</th>
+                                <th>Risk</th>
+                                <th>Decision</th>
+                                <th>SMS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="live-feed-body"></tbody>
+                    </table>
+                    <div id="live-feed-empty" class="table-empty">Live transactions will appear here as they are processed...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- MANUAL TRANSACTION REVIEW — Original form-based analysis       -->
+        <!-- ============================================================= -->
+        <main class="workspace">
+            <section class="card form-card">
+                <div class="section-head">
+                    <div>
+                        <h2>Manual Transaction Review</h2>
+                        <p>Run fraud analysis on specific transactions. Use the form below or load a sample.</p>
+                    </div>
+                </div>
+
+                <div class="sample-strip">
+                    <div class="input-group compact">
+                        <label for="sample-profile">Quick sample</label>
+                        <select id="sample-profile" name="sample_profile">
+                            {% for profile in config.sample_profiles %}
+                            <option value="{{ profile.value }}" {% if profile.value == config.defaults.sample_profile %}selected{% endif %}>
+                                {{ profile.label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button id="load-sample" class="button button-secondary" type="button">Load sample</button>
+                </div>
+
+                <div id="form-feedback" class="feedback" hidden></div>
+
+                <form id="transaction-form" novalidate>
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="card-number">Card Number</label>
+                            <input id="card-number" name="card_number" type="text" inputmode="numeric" maxlength="23" value="{{ config.defaults.card_number }}" placeholder="4532 1045 8871 3204">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="card-holder-name">Card Holder Name</label>
+                            <input id="card-holder-name" name="card_holder_name" type="text" value="{{ config.defaults.card_holder_name }}" placeholder="Daniel Brooks">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="transaction-amount">Transaction Amount</label>
+                            <input id="transaction-amount" name="transaction_amount" type="number" min="0" step="0.01" value="{{ config.defaults.transaction_amount }}">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="transaction-time">Transaction Time</label>
+                            <input id="transaction-time" name="transaction_time" type="time" value="{{ config.defaults.transaction_time }}">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="location">Location</label>
+                            <select id="location" name="location">
+                                {% for location in config.location_options %}
+                                <option value="{{ location }}" {% if location == config.defaults.location %}selected{% endif %}>{{ location }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="merchant-type">Merchant Type</label>
+                            <select id="merchant-type" name="merchant_type">
+                                {% for merchant in config.merchant_options %}
+                                <option value="{{ merchant }}" {% if merchant == config.defaults.merchant_type %}selected{% endif %}>{{ merchant }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="action-row">
+                        <button id="analyze-button" class="button button-primary" type="submit">Analyze transaction</button>
+                        <p class="action-note">Suspicious or blocked transactions can automatically trigger SMS alerts to the logged-in user.</p>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card result-card">
+                <div class="section-head">
+                    <div>
+                        <h2>Decision</h2>
+                        <p>Use the result panel to act quickly without overloading the analyst.</p>
+                    </div>
+                </div>
+
+                <div id="result-empty" class="result-empty">
+                    <h3>No transaction analyzed yet</h3>
+                    <p>Run a review to see the approval decision, explanation, and SMS alert status.</p>
+                    <ul>
+                        <li>Approved transactions stay frictionless.</li>
+                        <li>Suspicious transactions require OTP verification.</li>
+                        <li>Blocked transactions trigger fraud alerts.</li>
+                    </ul>
+                </div>
+
+                <div id="result-panel" class="result-panel" hidden>
+                    <div id="decision-banner" class="decision-banner">
+                        <div class="decision-text">
+                            <span id="risk-chip" class="risk-chip">Safe</span>
+                            <h3 id="decision-title">Transaction Approved</h3>
+                            <p id="decision-summary"></p>
+                        </div>
+                    </div>
+
+                    <div class="score-block">
+                        <div class="score-label-row">
+                            <span>Risk score</span>
+                            <strong id="risk-score-value">0.0 / 100</strong>
+                        </div>
+                        <div class="progress-track">
+                            <div id="risk-score-bar" class="progress-bar"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric-grid">
+                        <div class="metric-card">
+                            <span>ML probability</span>
+                            <strong id="ml-probability">0.00%</strong>
+                        </div>
+                        <div class="metric-card">
+                            <span>Behavior score</span>
+                            <strong id="behavior-score">0.00%</strong>
+                        </div>
+                        <div class="metric-card">
+                            <span>Anomaly risk</span>
+                            <strong id="anomaly-score">0.00%</strong>
+                        </div>
+                    </div>
+
+                    <div id="alert-status" class="alert-status" hidden></div>
+
+                    <div class="explanation-block">
+                        <h4>Why this decision was made</h4>
+                        <ul id="reason-list" class="reason-list"></ul>
+                    </div>
+
+                    <div class="guidance-block">
+                        <h4>Recommended next step</h4>
+                        <p id="decision-guidance"></p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <section class="analytics-grid">
+            <article class="card analytics-card">
+                <div class="section-head">
+                    <div>
+                        <h2>Dataset Balance</h2>
+                        <p>The training data is highly imbalanced, so SMOTE is used during model training.</p>
+                    </div>
+                </div>
+
+                <div class="stacked-bar" aria-hidden="true">
+                    <div class="stack-segment normal-segment" style="width: {{ config.dataset.normal_percentage }}%"></div>
+                    <div class="stack-segment fraud-segment" style="width: {{ config.dataset.fraud_percentage }}%"></div>
+                </div>
+
+                <div class="legend-list">
+                    <div class="legend-row">
+                        <div class="legend-key">
+                            <span class="legend-dot normal-dot"></span>
+                            <span>Normal transactions</span>
+                        </div>
+                        <strong>{{ "{:,}".format(config.dataset.normal_count) }}</strong>
+                    </div>
+                    <div class="legend-row">
+                        <div class="legend-key">
+                            <span class="legend-dot fraud-dot"></span>
+                            <span>Fraud transactions</span>
+                        </div>
+                        <strong>{{ "{:,}".format(config.dataset.fraud_count) }}</strong>
+                    </div>
+                </div>
+            </article>
+
+            <article class="card analytics-card">
+                <div class="section-head">
+                    <div>
+                        <h2>Session Risk Mix</h2>
+                        <p>See how the current authenticated session trends across safe, review, and blocked outcomes.</p>
+                    </div>
+                </div>
+                <div id="session-distribution" class="distribution-list"></div>
+            </article>
+
+            <article class="card analytics-card">
+                <div class="section-head">
+                    <div>
+                        <h2>Model Summary</h2>
+                        <p>The best model is selected automatically using ROC-AUC.</p>
+                    </div>
+                </div>
+
+                <div class="model-table">
+                    <div class="model-table-head">
+                        <span>Model</span>
+                        <span>ROC-AUC</span>
+                    </div>
+                    {% for row in config.metrics_table %}
+                    <div class="model-row {% if loop.first %}model-row-active{% endif %}">
+                        <span>{{ row.model }}</span>
+                        <strong>{{ "%.4f"|format(row.roc_auc) }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if config.top_features %}
+                <div class="feature-block">
+                    <h4>Top features</h4>
+                    <div class="feature-list">
+                        {% for feature in config.top_features %}
+                        <div class="feature-row">
+                            <div class="feature-copy">
+                                <span>{{ feature.feature }}</span>
+                                <strong>{{ "%.4f"|format(feature.importance) }}</strong>
+                            </div>
+                            <div class="feature-track">
+                                <div class="feature-bar" style="width: {{ (feature.importance / config.top_features[0].importance * 100) if config.top_features[0].importance else 0 }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </article>
+        </section>
+
+        <section class="card history-card">
+            <div class="section-head history-head">
+                <div>
+                    <h2>Recent Transaction Checks</h2>
+                    <p>The table stays light and focused so you can scan recent outcomes quickly.</p>
+                </div>
+                <button id="download-report" class="button button-secondary" type="button" disabled>Download CSV</button>
+            </div>
+
+            <div class="history-table-shell">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Card</th>
+                            <th>Customer</th>
+                            <th>Amount</th>
+                            <th>Merchant</th>
+                            <th>Risk</th>
+                            <th>Decision</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body"></tbody>
+                </table>
+                <div id="history-empty" class="table-empty">No transactions in this session yet.</div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        window.PAGE_CONFIG = {{ config | tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

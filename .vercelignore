@@ -1,0 +1,15 @@
+# Large data files — not needed at runtime
+creditcard.csv
+creditcard.csv.zip
+credit-card-fraud-detection-predictive-models.ipynb
+
+# Python caches
+__pycache__
+*.pyc
+.venv
+
+# OS files
+.DS_Store
+
+# Docker (not needed for Vercel)
+Dockerfile

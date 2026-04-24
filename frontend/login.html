@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EXPayshield — Secure Login</title>
+    <meta name="description" content="AI-powered real-time credit card fraud detection with ML scoring, live monitoring, and SMS alerts.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-page="login">
+    <main class="auth-page">
+        <section class="auth-panel-wide auth-card">
+
+            <!-- ── Hero Section ── -->
+            <div class="login-hero">
+                <div class="login-brand">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="EXPayshield" class="login-brand-logo">
+                    <span class="login-brand-name">EXPayshield</span>
+                </div>
+                <h1>Real-Time Credit Card<br>Fraud Detection</h1>
+                <p class="auth-copy">
+                    Powered by machine learning with live transaction monitoring, behavior analysis, and automated SMS alerts. Login to access the dashboard.
+                </p>
+            </div>
+
+            <!-- ── Mode Selector ── -->
+            <div class="mode-comparison">
+                <h2 class="mode-title">Choose Your Experience</h2>
+                <p class="mode-subtitle">Select a mode below. Click on a card to switch.</p>
+
+                <div class="mode-cards">
+                    <!-- Development Mode Card — clickable -->
+                    <div class="mode-card mode-card-active" id="mode-card-dev" role="button" tabindex="0" data-mode="dev">
+                        <div class="mode-card-badge">
+                            <span class="mode-active-tag" id="mode-tag-dev">● SELECTED</span>
+                        </div>
+                        <div class="mode-card-icon">🛠️</div>
+                        <h3>Development Mode</h3>
+                        <p class="mode-card-desc">Free testing environment. Explore every feature without SMS costs.</p>
+                        <ul class="mode-features">
+                            <li><span class="feat-icon feat-yes">✓</span> OTP displayed on screen</li>
+                            <li><span class="feat-icon feat-yes">✓</span> Any phone number works</li>
+                            <li><span class="feat-icon feat-yes">✓</span> Multiple users at once</li>
+                            <li><span class="feat-icon feat-yes">✓</span> No Twilio account needed</li>
+                            <li><span class="feat-icon feat-yes">✓</span> Unlimited OTPs</li>
+                            <li><span class="feat-icon feat-no">✗</span> No real SMS delivery</li>
+                        </ul>
+                        <div class="mode-card-footer">
+                            <span class="mode-price">Free</span>
+                            <span class="mode-for">For development & demos</span>
+                        </div>
+                    </div>
+
+                    <!-- Production Mode Card — clickable -->
+                    <div class="mode-card" id="mode-card-prod" role="button" tabindex="0" data-mode="twilio">
+                        <div class="mode-card-badge">
+                            <span class="mode-active-tag" id="mode-tag-prod" hidden>● SELECTED</span>
+                        </div>
+                        <div class="mode-card-icon">🔒</div>
+                        <h3>Production Mode</h3>
+                        <p class="mode-card-desc">Real SMS delivery via Twilio. Full security for live deployments.</p>
+                        <ul class="mode-features">
+                            <li><span class="feat-icon feat-yes">✓</span> OTP sent via real SMS</li>
+                            <li><span class="feat-icon feat-yes">✓</span> Twilio verified numbers</li>
+                            <li><span class="feat-icon feat-yes">✓</span> Fraud alerts via SMS</li>
+                            <li><span class="feat-icon feat-yes">✓</span> Full security pipeline</li>
+                            <li><span class="feat-icon feat-warn">⚡</span> 3 SMS per 25 min limit</li>
+                            <li><span class="feat-icon feat-warn">⚡</span> Twilio account required</li>
+                        </ul>
+                        <div class="mode-card-footer">
+                            <span class="mode-price">Twilio Credits</span>
+                            <span class="mode-for">For production & clients</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Divider ── -->
+            <div class="login-divider">
+                <span>Login to Dashboard</span>
+            </div>
+
+            <!-- ── Active Mode Badge (dynamic) ── -->
+            <div class="env-badge env-development" id="env-badge">
+                <span class="env-icon" id="env-badge-icon">🛠️</span>
+                <div class="env-info">
+                    <strong id="env-badge-title">Development Mode Selected</strong>
+                    <span id="env-badge-desc">OTP is displayed on-screen for testing. No SMS is sent.</span>
+                </div>
+            </div>
+
+            <!-- ── Login Form ── -->
+            <div id="auth-feedback" class="feedback" hidden></div>
+
+            <form id="login-form" class="auth-form" novalidate>
+                <div class="input-group">
+                    <label for="mobile-number">Mobile Number</label>
+                    <input
+                        id="mobile-number"
+                        name="mobile_number"
+                        type="tel"
+                        inputmode="tel"
+                        placeholder="+919876543210"
+                        value="{{ config.default_phone }}"
+                    >
+                    <p class="field-note" id="field-note-text">
+                        Enter any valid phone number. OTP will be shown on screen — no SMS is sent.
+                    </p>
+                </div>
+
+                <button id="send-otp-button" class="button button-primary button-full" type="submit">
+                    🛠️ Generate OTP
+                </button>
+            </form>
+
+            <!-- ── Security Footer ── -->
+            <div class="auth-footer">
+                <div class="auth-footer-item">
+                    <span class="auth-footer-icon">🛡️</span>
+                    <span>256-bit encrypted</span>
+                </div>
+                <div class="auth-footer-item">
+                    <span class="auth-footer-icon">⏱️</span>
+                    <span>OTP valid 5 min</span>
+                </div>
+                <div class="auth-footer-item">
+                    <span class="auth-footer-icon">🔑</span>
+                    <span>5 max attempts</span>
+                </div>
+                <div class="auth-footer-item">
+                    <span class="auth-footer-icon">🤖</span>
+                    <span>ML-powered</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Jinja2: Flask injects the config as JSON here at render time -->
+    <script>window.PAGE_CONFIG = {{ config | tojson | safe }};</script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
