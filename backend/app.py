@@ -84,7 +84,7 @@ def create_app() -> Flask:
             "login.html",
             config={
                 "title": "Secure Login",
-                "default_phone": "",
+                "default_phone": "+91",
                 "use_twilio": USE_TWILIO,
                 "otp_mode": OTP_MODE_LABEL,
                 "otp_mode_desc": OTP_MODE_DESCRIPTION,
