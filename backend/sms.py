@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Only enforced in production mode (USE_TWILIO=True)
 # ---------------------------------------------------------------------------
 SMS_RATE_LIMIT = 5                # max messages allowed
-SMS_RATE_WINDOW = 60 * 60         # 60 minutes in seconds
+SMS_RATE_WINDOW = 5 * 60          # 5 minutes in seconds
 
 _rate_lock = Lock()
 _sms_timestamps: dict[str, list[float]] = defaultdict(list)
