@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 # SMS Rate Limiter — 3 messages per 25 minutes per phone number
 # Only enforced in production mode (USE_TWILIO=True)
 # ---------------------------------------------------------------------------
-SMS_RATE_LIMIT = 3                # max messages allowed
-SMS_RATE_WINDOW = 25 * 60         # 25 minutes in seconds
+SMS_RATE_LIMIT = 2                # max messages allowed
+SMS_RATE_WINDOW = 60 * 60         # 60 minutes in seconds
 
 _rate_lock = Lock()
 _sms_timestamps: dict[str, list[float]] = defaultdict(list)
