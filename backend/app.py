@@ -39,6 +39,15 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 MODEL_PATH = ROOT_DIR / "fraud_model.pkl"
 
 
+# Track SMS stats for health check
+sms_stats = {
+    "total_sent": 0,
+    "total_failed": 0,
+    "rate_limited": 0,
+    "last_error": None
+}
+
+
 def create_app() -> Flask:
     app = Flask(
         __name__,
@@ -127,6 +136,9 @@ def create_app() -> Flask:
             "model_loaded": True,
             "selected_model": get_artifact()["best_model_name"],
             "live_transactions_generated": buffer.count(),
+            "sms_stats": sms_stats,
+            "session_mode": session.get("sms_mode"),
+            "is_auth": is_authenticated()
         })
 
     # -----------------------------------------------------------------------
@@ -185,12 +197,18 @@ def create_app() -> Flask:
                 print(f"     Provider: {sms_result.provider}\n")
                 # Translate raw Twilio errors to user-friendly messages
                 friendly_error = _friendly_sms_error(sms_result)
+                sms_stats["total_failed"] += 1
+                sms_stats["last_error"] = sms_result.error
+                if sms_result.rate_limited:
+                    sms_stats["rate_limited"] += 1
+                
                 return jsonify({
                     "ok": False,
                     "errors": [friendly_error],
                     "error_type": "production_sms_failed",
                 }), 422
 
+            sms_stats["total_sent"] += 1
             return jsonify({
                 "ok": True,
                 "message": "OTP sent via SMS successfully.",
@@ -458,7 +476,13 @@ def create_app() -> Flask:
                     "sms": sms_result.to_dict(),
                 }
                 if not sms_result.success:
+                    sms_stats["total_failed"] += 1
+                    sms_stats["last_error"] = sms_result.error
+                    if sms_result.rate_limited:
+                        sms_stats["rate_limited"] += 1
                     warnings.append("Fraud detected but SMS alert could not be delivered.")
+                else:
+                    sms_stats["total_sent"] += 1
             else:
                 alert_response = {
                     "message": alert_message,
