@@ -630,10 +630,7 @@ function initializeLiveMonitor(state, storageKey) {
     function startPolling() {
         if (pollTimer) return;
         poll(); // Immediate first poll
-        
-        // Use 10s interval for Production Mode to stay under SMS limits
-        const interval = window.PAGE_CONFIG?.use_twilio ? 10000 : POLL_INTERVAL;
-        pollTimer = setInterval(poll, interval);
+        pollTimer = setInterval(poll, POLL_INTERVAL); // Always use the fast 3s interval
     }
 
     function stopPolling() {
