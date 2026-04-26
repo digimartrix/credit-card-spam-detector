@@ -398,14 +398,10 @@ def create_app() -> Flask:
         buffer = get_transaction_buffer()
 
         # Serverless mode: generate a transaction on-demand per poll
-        # Throttled to once every 10 seconds to manage SMS costs and API limits
         if os.getenv("VERCEL"):
-            last_gen_time = getattr(app, "_last_gen_time", 0)
-            if time.time() - last_gen_time >= 10:
-                from backend.transaction_generator import generate_live_transaction
-                tx = generate_live_transaction()
-                buffer.push(tx)
-                app._last_gen_time = time.time()
+            from backend.transaction_generator import generate_live_transaction
+            tx = generate_live_transaction()
+            buffer.push(tx)
 
         latest = buffer.latest()
 
