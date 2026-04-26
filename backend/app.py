@@ -166,6 +166,9 @@ def create_app() -> Flask:
         otp_code = issue_otp(mobile_number)
         set_pending_phone(mobile_number)
 
+        # Remember mode choice so fraud alerts use the same delivery method
+        session["sms_mode"] = "twilio" if use_production else "dev"
+
         if use_production:
             # ── Production: send real SMS via Twilio ──
             sms_result = send_sms(
@@ -440,7 +443,12 @@ def create_app() -> Flask:
         if alert_message:
             user_phone = current_user_phone() or ""
             if user_phone:
-                sms_result = send_sms(user_phone, alert_message)
+                # Use the same SMS mode the user chose at login
+                use_twilio_for_alerts = session.get("sms_mode") == "twilio"
+                sms_result = send_sms(
+                    user_phone, alert_message,
+                    force_twilio=use_twilio_for_alerts,
+                )
                 alert_response = {
                     "message": alert_message,
                     "sms": sms_result.to_dict(),
