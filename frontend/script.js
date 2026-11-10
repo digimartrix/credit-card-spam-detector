@@ -19,17 +19,17 @@ if (page === "login") {
 
 
 /* ================================================================
-   LOGIN PAGE — Interactive Mode Selector + Hybrid OTP
-   Users can click on Dev or Prod cards to choose their mode.
-   Production errors are translated to friendly messages.
+   LOGIN PAGE — Interactive mode selector for development and email OTP.
    ================================================================ */
 function initializeLoginPage() {
     const loginForm = document.getElementById("login-form");
     const mobileNumberInput = document.getElementById("mobile-number");
+    const emailAddressInput = document.getElementById("email-address");
     const sendOtpButton = document.getElementById("send-otp-button");
     const feedback = document.getElementById("auth-feedback");
 
     // Mode selector elements
+    const modeComparison = document.getElementById("mode-comparison");
     const modeCardDev = document.getElementById("mode-card-dev");
     const modeCardProd = document.getElementById("mode-card-prod");
     const modeTagDev = document.getElementById("mode-tag-dev");
@@ -40,28 +40,29 @@ function initializeLoginPage() {
     const envBadgeDesc = document.getElementById("env-badge-desc");
     const fieldNoteText = document.getElementById("field-note-text");
 
-    // Current selected mode — starts at "dev"
-    let selectedMode = "dev";
+    // Production deployments default to email and hide the dev-only option.
+    let selectedMode = config.default_otp_mode || "dev";
+    modeCardDev.hidden = !config.allow_dev_mode;
 
     // ── Mode configs for dynamic UI updates ──
     const MODE_UI = {
         dev: {
             badgeClass: "env-development",
             icon: "🛠️",
-            title: "Development Mode Selected",
-            desc: "OTP is displayed on-screen for testing. No SMS is sent.",
-            fieldNote: "Enter any valid phone number. OTP will be shown on screen — no SMS is sent.",
-            buttonLabel: "🛠️ Generate OTP",
-            buttonLoading: "Generating OTP...",
+            title: "Demo code",
+            desc: "Your one-time code will appear on this device.",
+            fieldNote: "The demo code expires after five minutes.",
+            buttonLabel: "Generate demo code",
+            buttonLoading: "Generating code…",
         },
-        twilio: {
+        email: {
             badgeClass: "env-production",
-            icon: "🔒",
-            title: "Production Mode Selected",
-            desc: "OTP will be sent as a real SMS via Twilio to verified numbers.",
-            fieldNote: "Use international format (e.g. +91XXXXXXXXXX). Only Twilio-verified numbers will receive SMS. Limited to 3 SMS per 25 minutes.",
-            buttonLabel: "📲 Send OTP via SMS",
-            buttonLoading: "Sending SMS...",
+            icon: "✉️",
+            title: "Email verification",
+            desc: "A six-digit code will be sent to your email.",
+            fieldNote: "Your code expires after five minutes.",
+            buttonLabel: "Send sign-in code <span aria-hidden=\"true\">→</span>",
+            buttonLoading: "Sending code…",
         },
     };
 
@@ -70,10 +71,12 @@ function initializeLoginPage() {
         const ui = MODE_UI[mode];
 
         // Cards
-        modeCardDev.classList.toggle("mode-card-active", mode === "dev");
-        modeCardProd.classList.toggle("mode-card-active", mode === "twilio");
+        modeCardDev.classList.toggle("mode-choice-option-active", mode === "dev");
+        modeCardProd.classList.toggle("mode-choice-option-active", mode === "email");
+        modeCardDev.setAttribute("aria-pressed", String(mode === "dev"));
+        modeCardProd.setAttribute("aria-pressed", String(mode === "email"));
         if (modeTagDev) modeTagDev.hidden = mode !== "dev";
-        if (modeTagProd) modeTagProd.hidden = mode !== "twilio";
+        if (modeTagProd) modeTagProd.hidden = mode !== "email";
 
         // Badge
         envBadge.className = "env-badge " + ui.badgeClass;
@@ -98,11 +101,10 @@ function initializeLoginPage() {
     }
 
     modeCardDev.addEventListener("click", () => selectMode("dev"));
-    modeCardProd.addEventListener("click", () => selectMode("twilio"));
-
-    // Keyboard accessibility
-    modeCardDev.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMode("dev"); } });
-    modeCardProd.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMode("twilio"); } });
+    modeCardProd.addEventListener("click", () => selectMode("email"));
+    modeComparison.hidden = !config.allow_dev_mode;
+    modeCardDev.hidden = !config.allow_dev_mode;
+    applyModeUI(selectedMode);
 
     // ── Form submit ──
     loginForm.addEventListener("submit", async (event) => {
@@ -118,21 +120,14 @@ function initializeLoginPage() {
                 credentials: "same-origin",
                 body: JSON.stringify({
                     mobile_number: mobileNumberInput.value.trim(),
+                    email_address: emailAddressInput.value.trim(),
                     mode: selectedMode,
                 }),
             });
             const payload = await response.json();
 
             if (!response.ok || !payload.ok) {
-                // Check if it's a production SMS error — show friendly message
-                if (payload.error_type === "production_sms_failed") {
-                    showFeedback(feedback, [
-                        ...payload.errors,
-                        "💡 Tip: Switch to Development Mode (click the card above) to test without SMS."
-                    ], "error");
-                } else {
-                    showFeedback(feedback, payload.errors || ["Unable to send OTP."], "error");
-                }
+                showFeedback(feedback, payload.errors || ["Unable to send OTP."], "error");
                 return;
             }
 
@@ -169,7 +164,7 @@ function initializeLoginPage() {
 
 
 /* ================================================================
-   OTP VERIFICATION PAGE — Hybrid OTP
+   OTP VERIFICATION PAGE — Email or local development OTP
    In development mode: shows the OTP in a prominent card with
    auto-fill capability. In production mode: standard OTP entry.
    ================================================================ */
@@ -183,11 +178,11 @@ function initializeOtpPage() {
     const devOtpAutofill = document.getElementById("dev-otp-autofill");
     const resendButton = document.getElementById("resend-otp-button");
 
-    const useTwilio = config.use_twilio || false;
+    const useEmail = config.use_email || false;
     const developmentOtp = window.sessionStorage.getItem("development-otp");
 
     // ── Show dev OTP display card if in development mode ──
-    if (!useTwilio && developmentOtp && devOtpDisplay && devOtpCode) {
+    if (!useEmail && developmentOtp && devOtpDisplay && devOtpCode) {
         devOtpDisplay.hidden = false;
         devOtpCode.textContent = developmentOtp;
 
@@ -198,10 +193,9 @@ function initializeOtpPage() {
                 otpForm.dispatchEvent(new Event("submit", { cancelable: true }));
             });
         }
-    } else if (useTwilio) {
-        // Production mode — hide the dev display
+    } else if (useEmail) {
         if (devOtpDisplay) devOtpDisplay.hidden = true;
-        showFeedback(feedback, ["📲 Check your phone for the SMS with your verification code."], "success");
+        showFeedback(feedback, [`✉️ Check ${config.pending_email_masked} for your verification code.`], "success");
     }
 
     // ── OTP Verification Form ──
@@ -217,6 +211,7 @@ function initializeOtpPage() {
                 credentials: "same-origin",
                 body: JSON.stringify({
                     mobile_number: config.pending_phone,
+                    email_address: config.pending_email,
                     otp: otpInput.value.trim(),
                 }),
             });
@@ -257,6 +252,7 @@ function initializeOtpPage() {
                     credentials: "same-origin",
                     body: JSON.stringify({
                         mobile_number: config.pending_phone,
+                        email_address: config.pending_email,
                     }),
                 });
                 const payload = await response.json();
@@ -281,7 +277,7 @@ function initializeOtpPage() {
                     feedback,
                     [payload.development_otp
                         ? `New OTP generated: ${payload.development_otp}`
-                        : "New OTP sent to your phone."],
+                        : "New OTP sent to your email."],
                     payload.development_otp ? "warning" : "success"
                 );
 
@@ -437,8 +433,13 @@ function initializeDashboardPage() {
             renderHistory();
             renderSessionDistribution();
             const messages = ["Transaction analyzed successfully."];
-            if (payload.alert?.sms?.success) {
-                messages.push(payload.alert.sms.dry_run ? "SMS alert simulated in dry-run mode." : "SMS alert sent.");
+            if (payload.alert?.email?.success) {
+                const deliveryMessage = payload.alert.email.skipped
+                    ? "Email alerts are on cooldown."
+                    : payload.alert.email.dry_run
+                        ? "Email alert simulated in development mode."
+                        : "Email alert sent.";
+                messages.push(deliveryMessage);
             }
             if (Array.isArray(payload.warnings) && payload.warnings.length > 0) {
                 messages.push(...payload.warnings);
@@ -513,13 +514,18 @@ function initializeDashboardPage() {
             alertStatus.innerHTML = "";
             return;
         }
-        const sms = alert.sms || {};
-        const type = sms.success ? "success" : "error";
-        const lines = [`<strong>SMS alert</strong>`, `<p>${escapeHtml(alert.message)}</p>`];
-        if (sms.success) {
-            lines.push(`<p>${sms.dry_run ? "Simulated SMS delivery in dry-run mode." : `Delivered via ${escapeHtml(sms.provider || "twilio")}.`}</p>`);
+        const email = alert.email || {};
+        const type = email.success ? "success" : "error";
+        const lines = [`<strong>Email alert</strong>`, `<p>${escapeHtml(alert.message)}</p>`];
+        if (email.success) {
+            const status = email.skipped
+                ? "Email delivery is on cooldown."
+                : email.dry_run
+                    ? "Simulated email delivery in development mode."
+                    : `Delivered via ${escapeHtml(email.provider || "Gmail SMTP")}.`;
+            lines.push(`<p>${status}</p>`);
         } else {
-            lines.push(`<p>${escapeHtml(sms.error || "SMS delivery failed.")}</p>`);
+            lines.push(`<p>${escapeHtml(email.error || "Email delivery failed.")}</p>`);
         }
         alertStatus.hidden = false;
         alertStatus.className = `alert-status ${type}`;
@@ -733,19 +739,22 @@ function initializeLiveMonitor(state, storageKey) {
         liveRiskBar.style.background = result.color;
         liveDecision.textContent = result.decision;
 
-        // SMS alert badge
+        // Email alert badge
         if (alert) {
             liveAlertBadge.hidden = false;
-            const sms = alert.sms || {};
-            if (sms.success && sms.dry_run) {
-                liveAlertBadge.className = "live-alert-badge sms-dry";
-                liveAlertBadge.textContent = `📱 SMS simulated: ${alert.message}`;
-            } else if (sms.success) {
-                liveAlertBadge.className = "live-alert-badge sms-sent";
-                liveAlertBadge.textContent = `📱 SMS sent: ${alert.message}`;
+            const email = alert.email || {};
+            if (email.success && email.skipped) {
+                liveAlertBadge.className = "live-alert-badge email-dry";
+                liveAlertBadge.textContent = `✉️ Email cooldown: ${alert.message}`;
+            } else if (email.success && email.dry_run) {
+                liveAlertBadge.className = "live-alert-badge email-dry";
+                liveAlertBadge.textContent = `✉️ Email simulated: ${alert.message}`;
+            } else if (email.success) {
+                liveAlertBadge.className = "live-alert-badge email-sent";
+                liveAlertBadge.textContent = `✉️ Email sent: ${alert.message}`;
             } else {
-                liveAlertBadge.className = "live-alert-badge sms-failed";
-                liveAlertBadge.textContent = `⚠ SMS failed: ${sms.error || "Delivery error"}`;
+                liveAlertBadge.className = "live-alert-badge email-failed";
+                liveAlertBadge.textContent = `⚠ Email failed: ${email.error || "Delivery error"}`;
             }
         } else {
             liveAlertBadge.hidden = true;
@@ -769,10 +778,10 @@ function initializeLiveMonitor(state, storageKey) {
         liveFeedBody.innerHTML = liveFeed.map((item, idx) => {
             const bandClass = normalizeBand(item.risk_band);
             const isNew = idx === 0 ? " history-row-new" : "";
-            const smsIcon = item.alert
-                ? (item.alert.sms?.success ? "✅" : "❌")
+            const emailIcon = item.alert
+                ? (item.alert.email?.success ? "✅" : "❌")
                 : "—";
-            return `<tr class="history-row-${bandClass}${isNew}"><td>${liveCounts.total - idx}</td><td>${escapeHtml(item.card_masked)}</td><td>${escapeHtml(item.card_holder_name)}</td><td>${escapeHtml(item.merchant_name || item.merchant_type)}</td><td>${escapeHtml(item.city || item.location)}</td><td>${formatCurrency(item.transaction_amount)}</td><td><span class="history-risk-pill ${bandClass}">${escapeHtml(item.risk_band)}</span></td><td>${escapeHtml(item.decision)}</td><td>${smsIcon}</td></tr>`;
+            return `<tr class="history-row-${bandClass}${isNew}"><td>${liveCounts.total - idx}</td><td>${escapeHtml(item.card_masked)}</td><td>${escapeHtml(item.card_holder_name)}</td><td>${escapeHtml(item.merchant_name || item.merchant_type)}</td><td>${escapeHtml(item.city || item.location)}</td><td>${formatCurrency(item.transaction_amount)}</td><td><span class="history-risk-pill ${bandClass}">${escapeHtml(item.risk_band)}</span></td><td>${escapeHtml(item.decision)}</td><td>${emailIcon}</td></tr>`;
         }).join("");
     }
 

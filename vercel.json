@@ -15,9 +15,5 @@
       "src": "/(.*)",
       "dest": "/api/index.py"
     }
-  ],
-  "env": {
-    "FLASK_SECRET_KEY": "expayshield-vercel-prod-secret-2026",
-    "OTP_MODE": "dev"
-  }
+  ]
 }

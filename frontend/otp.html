@@ -20,7 +20,7 @@
             </div>
 
             <!-- Environment mode badge -->
-            <div class="env-badge {% if config.use_twilio %}env-production{% else %}env-development{% endif %}">
+            <div class="env-badge {% if config.use_email %}env-production{% else %}env-development{% endif %}">
                 <span class="env-icon">{{ config.otp_mode_icon }}</span>
                 <div class="env-info">
                     <strong>{{ config.otp_mode }} Mode</strong>
@@ -31,10 +31,10 @@
             <div class="eyebrow">OTP Verification</div>
             <h1>Enter the 6-digit code</h1>
             <p class="auth-copy">
-                {% if config.use_twilio %}
-                We sent a verification code to <strong>{{ config.pending_phone_masked }}</strong> via SMS. Enter it below to continue.
+                {% if config.use_email %}
+                We sent a verification code to <strong>{{ config.pending_email_masked }}</strong>. Enter it below to continue.
                 {% else %}
-                Your OTP was generated for <strong>{{ config.pending_phone_masked }}</strong>. Check the highlighted box below or the server console.
+                Your OTP was generated for <strong>{{ config.pending_email_masked }}</strong>. Check the highlighted box below.
                 {% endif %}
             </p>
 
@@ -45,7 +45,7 @@
                     <strong>Development OTP</strong>
                 </div>
                 <div class="dev-otp-code" id="dev-otp-code">------</div>
-                <p class="dev-otp-hint">This code is only visible in development mode. In production, it would arrive via SMS.</p>
+                <p class="dev-otp-hint">This code is only visible in local development mode. In email mode, it arrives in your inbox.</p>
                 <button type="button" class="dev-otp-autofill" id="dev-otp-autofill">Auto-fill & Verify →</button>
             </div>
 
@@ -71,7 +71,7 @@
             </form>
 
             <div class="otp-actions">
-                <a class="inline-link" href="{{ url_for('login') }}">← Use a different number</a>
+                <a class="inline-link" href="{{ url_for('login') }}">← Use a different email or number</a>
                 <button type="button" class="resend-link" id="resend-otp-button">Resend OTP</button>
             </div>
 

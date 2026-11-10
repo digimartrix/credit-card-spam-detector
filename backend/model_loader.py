@@ -43,7 +43,7 @@ def generate_serialized_sample(profile_name: str) -> dict[str, Any]:
     }
 
 
-def build_dashboard_config(user_phone: str) -> dict[str, Any]:
+def build_dashboard_config(user_phone: str, user_email: str) -> dict[str, Any]:
     artifact = get_artifact()
     profile = artifact["profile"]
     metrics_table = format_metrics_table(artifact["models_metrics"])
@@ -56,7 +56,7 @@ def build_dashboard_config(user_phone: str) -> dict[str, Any]:
             "title": "Review transactions with a secure fraud workflow.",
             "description": (
                 "This dashboard keeps fraud review fast and readable while combining the trained fraud model, "
-                "anomaly detection, behavior analysis, and SMS alerting."
+                "anomaly detection, behavior analysis, and email alerts."
             ),
         },
         "stats": [
@@ -88,5 +88,6 @@ def build_dashboard_config(user_phone: str) -> dict[str, Any]:
         "session": {
             "user_phone": user_phone,
             "user_phone_masked": mask_phone_number(user_phone),
+            "user_email": user_email,
         },
     }

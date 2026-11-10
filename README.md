@@ -3,7 +3,7 @@
 [![Vercel Deployment](https://img.shields.io/badge/Deploy-Vercel-black?logo=vercel)](https://credit-card-detector-liart.vercel.app)
 [![Tech Stack](https://img.shields.io/badge/Stack-Python%20%7C%20Flask%20%7C%20ML-blue)](https://github.com/digimartrix/credit-card-spam-detector)
 
-**EXPayshield** is a professional-grade credit card fraud detection system. It leverages advanced Machine Learning models to analyze transactions in real-time, providing immediate risk scoring and automated SMS alerts to prevent fraudulent activity.
+**EXPayshield** is a professional-grade credit card fraud detection system. It uses machine learning to analyze transactions in real time, provide risk scores, and send email alerts for suspicious activity.
 
 ---
 
@@ -15,9 +15,9 @@ Access the production dashboard here:
 
 ## ✨ Key Features
 - **🧠 Advanced ML Engine**: Real-time fraud scoring using Random Forest and Anomaly Detection.
-- **📲 Hybrid OTP Auth**: Secure login via Twilio SMS (Production) or On-Screen display (Development).
+- **✉️ Email OTP Auth**: Sign in with a mobile number and email address; verification codes can be sent through Google Apps Script or Gmail SMTP. Local development can display OTPs on-screen.
 - **⏱️ Live Monitor**: Continuous transaction generation and analysis simulation.
-- **🚨 Instant Alerts**: Automated SMS notifications for high-risk or suspicious transactions.
+- **🚨 Instant Alerts**: Email notifications for high-risk or suspicious transactions.
 - **💎 Premium UI**: Clean, responsive fintech dashboard with dark-mode accents and sticky navigation.
 - **☁️ Cloud Ready**: Optimized for serverless deployment on Vercel.
 
@@ -27,7 +27,7 @@ Access the production dashboard here:
 - **Backend**: Python, Flask, Gunicorn
 - **Machine Learning**: Scikit-learn, SMOTE, Pandas
 - **Frontend**: Vanilla JS, CSS3, HTML5
-- **Services**: Twilio API, Vercel
+- **Services**: Google Apps Script or Gmail SMTP, Vercel
 
 ---
 
@@ -52,6 +52,19 @@ python train_model.py
 # Run locally
 python app.py
 ```
+
+## ✉️ Email Configuration
+
+For email OTPs and fraud alerts, set `OTP_MODE=email` and `FLASK_SECRET_KEY`.
+The recommended domain-free option is Google Apps Script: set
+`EMAIL_PROVIDER=apps_script`, `APPS_SCRIPT_URL`, and `APPS_SCRIPT_SECRET`.
+See [the Apps Script setup guide](./apps_script/README.md). The Gmail SMTP
+alternative uses `EMAIL_PROVIDER=gmail_smtp`, `GMAIL_USERNAME`, and
+`GMAIL_APP_PASSWORD` (a Google App Password, not your regular password).
+Add production values in the Vercel project's Environment Variables settings,
+then redeploy for changes to take effect.
+
+To use the free on-screen OTP locally, leave `OTP_MODE=dev`.
 
 ---
 

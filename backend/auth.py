@@ -1,51 +1,39 @@
-"""
-Authentication module — Hybrid OTP system.
-
-Supports two modes controlled by USE_TWILIO in backend.config:
-  • Development (USE_TWILIO=False): OTP stored in-memory dict, shown on screen,
-    printed to console. Multiple users can login without Twilio.
-  • Production (USE_TWILIO=True): OTP sent via real Twilio SMS. OTP is NEVER
-    exposed in the API response for security.
-
-The in-memory otp_store allows concurrent dev logins without session conflicts.
-"""
+"""Session authentication and short-lived email OTP verification."""
 
 from __future__ import annotations
 
-import logging
+import hashlib
 import os
 import random
+import re
 import time
-import hashlib
 from functools import wraps
 from typing import Any, Callable
 
 from flask import current_app, jsonify, redirect, session, url_for
 
-from backend.config import USE_TWILIO
-
-
-logger = logging.getLogger(__name__)
 
 OTP_TTL_SECONDS = int(os.getenv("OTP_TTL_SECONDS", "300"))
 OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
 
-
-# ---------------------------------------------------------------------------
-# In-memory OTP store (used in BOTH modes for multi-user support)
-# Format: { phone_number: { "code": "123456", "expires_at": float, "attempts_left": int } }
-# ---------------------------------------------------------------------------
+# The session contains a hashed fallback so verification also works when a
+# serverless platform handles the two requests in different function instances.
 otp_store: dict[str, dict[str, Any]] = {}
 
 
 def normalize_mobile_number(raw_value: Any) -> str:
     value = str(raw_value or "").strip()
     digits = "".join(character for character in value if character.isdigit())
-
     if len(digits) < 10 or len(digits) > 15:
         raise ValueError("Mobile number must contain between 10 and 15 digits.")
-
     return f"+{digits}"
+
+
+def normalize_email_address(raw_value: Any) -> str:
+    value = str(raw_value or "").strip().lower()
+    if len(value) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+", value):
+        raise ValueError("Enter a valid email address.")
+    return value
 
 
 def mask_phone_number(phone_number: str) -> str:
@@ -55,146 +43,125 @@ def mask_phone_number(phone_number: str) -> str:
     return f"+{digits[:2]}******{digits[-2:]}"
 
 
-def issue_otp(phone_number: str) -> str:
-    """
-    Generate a 6-digit OTP and store it.
+def mask_email_address(email_address: str) -> str:
+    local_part, separator, domain = email_address.partition("@")
+    if not separator:
+        return "your email address"
+    visible = local_part[:1] or "*"
+    return f"{visible}{'*' * min(max(len(local_part) - 1, 3), 8)}@{domain}"
 
-    In development mode: stored in both otp_store (dict) AND session.
-    In production mode:  stored in both otp_store (dict) AND session.
-    The dict store enables multi-user dev testing.
-    """
-    # Clean up any expired OTPs first
+
+def _otp_identity(phone_number: str, email_address: str) -> str:
+    return f"{phone_number}:{email_address}"
+
+
+def issue_otp(phone_number: str, email_address: str) -> str:
+    """Generate a six-digit OTP, retaining only its hash in server state."""
     cleanup_expired_otps()
+    clear_otp_record()
 
     code = f"{random.SystemRandom().randint(0, 999999):06d}"
-
-    # Store in the in-memory dict (supports multiple concurrent users)
-    otp_store[phone_number] = {
-        "code": code,
-        "expires_at": time.time() + OTP_TTL_SECONDS,
-        "attempts_left": OTP_MAX_ATTEMPTS,
-    }
-
-    # Also store in session (for session-based verification fallback)
-    session["otp_record"] = {
+    identity = _otp_identity(phone_number, email_address)
+    expires_at = time.time() + OTP_TTL_SECONDS
+    code_hash = hash_otp_code(identity, code)
+    record = {
         "phone_number": phone_number,
-        "code_hash": hash_otp_code(phone_number, code),
-        "expires_at": time.time() + OTP_TTL_SECONDS,
+        "email_address": email_address,
+        "identity": identity,
+        "code_hash": code_hash,
+        "expires_at": expires_at,
         "attempts_left": OTP_MAX_ATTEMPTS,
     }
-
-    # In development mode, print OTP to console for easy access
-    if not USE_TWILIO:
-        logger.info("═══════════════════════════════════════════")
-        logger.info("  🛠️  DEVELOPMENT OTP for %s: %s", phone_number, code)
-        logger.info("═══════════════════════════════════════════")
-        print(f"\n{'='*50}")
-        print(f"  🛠️  DEVELOPMENT OTP for {phone_number}: {code}")
-        print(f"{'='*50}\n")
-
+    otp_store[identity] = dict(record)
+    session["otp_record"] = dict(record)
     return code
 
 
-def verify_otp_code(phone_number: str, otp_code: str) -> tuple[bool, str | None]:
-    """
-    Verify the OTP code against the stored value.
-
-    Checks the in-memory dict first (multi-user support), then falls
-    back to session-based verification.
-    """
+def verify_otp_code(
+    phone_number: str, email_address: str, otp_code: str
+) -> tuple[bool, str | None]:
     cleanup_expired_otps()
-    otp_code = str(otp_code).strip()
+    identity = _otp_identity(phone_number, email_address)
+    submitted_hash = hash_otp_code(identity, str(otp_code).strip())
 
-    # --- Try in-memory dict verification first ---
-    record = otp_store.get(phone_number)
-    if record:
-        if time.time() > float(record["expires_at"]):
-            otp_store.pop(phone_number, None)
-            clear_otp_record()
-            return False, "OTP expired. Request a new code."
-
-        if otp_code == record["code"]:
-            # Success — clean up
-            otp_store.pop(phone_number, None)
-            clear_otp_record()
-            return True, None
-        else:
-            record["attempts_left"] = int(record["attempts_left"]) - 1
-            if record["attempts_left"] <= 0:
-                otp_store.pop(phone_number, None)
-                clear_otp_record()
-                return False, "Too many invalid OTP attempts. Request a new code."
-            return False, f"Invalid OTP. {record['attempts_left']} attempts remaining."
-
-    # --- Fallback: session-based verification ---
-    session_record = session.get("otp_record")
-    if session_record is None:
+    record = otp_store.get(identity) or session.get("otp_record")
+    if record is None:
         return False, "OTP not found or expired. Request a new code."
 
-    if session_record.get("phone_number") != phone_number:
-        return False, "OTP does not match the current mobile number."
+    if record.get("identity") != identity:
+        return False, "Verify the code using the same phone number and email address."
 
-    if time.time() > float(session_record["expires_at"]):
-        clear_otp_record()
+    if time.time() >= float(record.get("expires_at", 0)):
+        clear_otp_record(identity)
         return False, "OTP expired. Request a new code."
 
-    if hash_otp_code(phone_number, otp_code) != session_record["code_hash"]:
-        session_record["attempts_left"] = int(session_record["attempts_left"]) - 1
-        if session_record["attempts_left"] <= 0:
-            clear_otp_record()
+    if submitted_hash != record.get("code_hash"):
+        record["attempts_left"] = int(record.get("attempts_left", OTP_MAX_ATTEMPTS)) - 1
+        if record["attempts_left"] <= 0:
+            clear_otp_record(identity)
             return False, "Too many invalid OTP attempts. Request a new code."
-        session["otp_record"] = session_record
-        return False, f"Invalid OTP. {session_record['attempts_left']} attempts remaining."
+        session["otp_record"] = record
+        if identity in otp_store:
+            otp_store[identity] = dict(record)
+        return False, f"Invalid OTP. {record['attempts_left']} attempts remaining."
 
-    clear_otp_record()
+    clear_otp_record(identity)
     return True, None
 
 
 def cleanup_expired_otps() -> None:
-    """Remove expired OTPs from both in-memory store and session."""
     now = time.time()
-
-    # Clean in-memory store
-    expired_phones = [
-        phone for phone, rec in otp_store.items()
-        if float(rec.get("expires_at", 0)) <= now
+    expired = [
+        identity
+        for identity, record in otp_store.items()
+        if float(record.get("expires_at", 0)) <= now
     ]
-    for phone in expired_phones:
-        otp_store.pop(phone, None)
+    for identity in expired:
+        otp_store.pop(identity, None)
 
-    # Clean session
     record = session.get("otp_record")
     if record and float(record.get("expires_at", 0)) <= now:
         clear_otp_record()
 
 
-def clear_otp_record() -> None:
-    session.pop("otp_record", None)
+def clear_otp_record(identity: str | None = None) -> None:
+    record = session.pop("otp_record", None)
+    stored_identity = identity or (record.get("identity") if record else None)
+    if stored_identity:
+        otp_store.pop(str(stored_identity), None)
 
 
-def hash_otp_code(phone_number: str, otp_code: str) -> str:
+def hash_otp_code(identity: str, otp_code: str) -> str:
     secret_key = str(current_app.config.get("SECRET_KEY", ""))
-    payload = f"{phone_number}:{otp_code}:{secret_key}".encode("utf-8")
+    payload = f"{identity}:{otp_code}:{secret_key}".encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
-def set_pending_phone(phone_number: str) -> None:
+def set_pending_login(phone_number: str, email_address: str) -> None:
+    clear_pending_login()
     session["pending_phone_number"] = phone_number
+    session["pending_email_address"] = email_address
 
 
 def get_pending_phone() -> str | None:
     return session.get("pending_phone_number")
 
 
-def clear_pending_phone() -> None:
-    session.pop("pending_phone_number", None)
+def get_pending_email() -> str | None:
+    return session.get("pending_email_address")
+
+
+def clear_pending_login() -> None:
     clear_otp_record()
+    session.pop("pending_phone_number", None)
+    session.pop("pending_email_address", None)
 
 
-def login_user(phone_number: str) -> None:
+def login_user(phone_number: str, email_address: str) -> None:
     session["authenticated"] = True
     session["user_phone_number"] = phone_number
-    clear_pending_phone()
+    session["user_email_address"] = email_address
+    clear_pending_login()
 
 
 def logout_user() -> None:
@@ -202,11 +169,19 @@ def logout_user() -> None:
 
 
 def is_authenticated() -> bool:
-    return bool(session.get("authenticated") and session.get("user_phone_number"))
+    return bool(
+        session.get("authenticated")
+        and session.get("user_phone_number")
+        and session.get("user_email_address")
+    )
 
 
 def current_user_phone() -> str | None:
     return session.get("user_phone_number")
+
+
+def current_user_email() -> str | None:
+    return session.get("user_email_address")
 
 
 def login_required_page(view: Callable[..., Any]) -> Callable[..., Any]:

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config.title }}</title>
-    <meta name="description" content="Real-time credit card fraud detection dashboard with ML-powered risk scoring, live transaction monitoring, and SMS alerts.">
+    <meta name="description" content="Real-time credit card fraud detection dashboard with ML-powered risk scoring, live transaction monitoring, and email alerts.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -62,7 +62,7 @@
             <div class="section-head">
                 <div>
                     <h2>🔴 Live Transaction Monitor</h2>
-                    <p>Real-time incoming transactions are auto-detected every 3 seconds. Fraud alerts are sent via SMS.</p>
+                    <p>Real-time incoming transactions are auto-detected every 3 seconds. Fraud alerts are sent by email.</p>
                 </div>
                 <div class="live-controls">
                     <div class="live-indicator" id="live-indicator">
@@ -145,7 +145,7 @@
                                 <th>Amount</th>
                                 <th>Risk</th>
                                 <th>Decision</th>
-                                <th>SMS</th>
+                                <th>Email</th>
                             </tr>
                         </thead>
                         <tbody id="live-feed-body"></tbody>
@@ -226,7 +226,7 @@
 
                     <div class="action-row">
                         <button id="analyze-button" class="button button-primary" type="submit">Analyze transaction</button>
-                        <p class="action-note">Suspicious or blocked transactions can automatically trigger SMS alerts to the logged-in user.</p>
+                        <p class="action-note">Suspicious or blocked transactions can automatically trigger email alerts to the logged-in user.</p>
                     </div>
                 </form>
             </section>
@@ -241,7 +241,7 @@
 
                 <div id="result-empty" class="result-empty">
                     <h3>No transaction analyzed yet</h3>
-                    <p>Run a review to see the approval decision, explanation, and SMS alert status.</p>
+                    <p>Run a review to see the approval decision, explanation, and email alert status.</p>
                     <ul>
                         <li>Approved transactions stay frictionless.</li>
                         <li>Suspicious transactions require OTP verification.</li>
